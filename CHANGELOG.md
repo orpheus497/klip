@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Refactored klipc command to use ConnectionHelper, eliminating ~100 lines of duplicated connection code
+- Refactored klipr command to use ConnectionHelper, eliminating ~100 lines of duplicated connection code
+- Integrated audit logging into klipc for tracking all file push operations (success, failure, dry-run)
+- Integrated audit logging into klipr for tracking all file pull operations (success, failure, dry-run)
 - Replaced shell-based SSH public key deployment with secure SFTP-based atomic file writes
 - Enhanced rsync implementation with context-aware non-blocking goroutines to prevent deadlocks
 - Updated all interactive input functions to use sanitization for security
@@ -69,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Created internal/cli/connection.go for shared connection setup logic
 - Created internal/logger/audit.go for security audit logging
+- Integrated ConnectionHelper into cmd/klipc/main.go and cmd/klipr/main.go
+- Integrated AuditLogger into cmd/klipc/main.go and cmd/klipr/main.go for transfer event tracking
 - Enhanced internal/config/validation.go with comprehensive validation functions
 - Enhanced internal/transfer/validation.go with ValidateExcludePattern and improved cleanup
 - Enhanced internal/ui/prompts.go with sanitization for all user inputs
@@ -76,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling and logging throughout validation functions
 - Added NewConnectionHelper to centralize profile selection and backend detection
 - Added CreateSSHClient to standardize SSH client creation across all commands
+- Fixed unused imports and type conversions in internal/cli/connection.go and internal/transfer/sftp.go
 
 ## [2.1.0] - 2025-11-08
 

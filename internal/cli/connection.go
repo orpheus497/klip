@@ -56,8 +56,9 @@ func NewConnectionHelper(cfg ConnectionConfig) (*ConnectionHelper, error) {
 	}
 
 	// Detect and select appropriate backend
-	detector := backend.NewDetector(log)
-	selectedBackend, err := detector.SelectBackend(context.Background(), profile.Backend)
+	registry := backend.NewRegistry()
+	detector := backend.NewDetector(registry)
+	selectedBackend, err := detector.SelectBackend(context.Background(), string(profile.Backend))
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect backend: %w", err)
 	}
@@ -92,12 +93,12 @@ func (h *ConnectionHelper) CreateSSHClient(ctx context.Context, timeout int) (*s
 
 	// Create SSH configuration
 	sshConfig := &ssh.Config{
-		Host:     hostname,
-		Port:     h.Profile.SSHPort,
-		User:     h.Profile.RemoteUser,
-		KeyPath:  h.Profile.SSHKeyPath,
-		Password: h.Profile.UsePassword,
-		Timeout:  timeout,
+		Host:        hostname,
+		Port:        h.Profile.SSHPort,
+		User:        h.Profile.RemoteUser,
+		KeyPath:     h.Profile.SSHKeyPath,
+		UsePassword: h.Profile.UsePassword,
+		Timeout:     time.Duration(timeout) * time.Second,
 	}
 
 	// Create SSH client
