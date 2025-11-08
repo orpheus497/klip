@@ -70,10 +70,10 @@ type ProgressTracker struct {
 // NewProgressTracker creates a new progress tracker
 func NewProgressTracker(totalFiles int, totalBytes int64) *ProgressTracker {
 	return &ProgressTracker{
-		totalFiles:    totalFiles,
-		totalBytes:    totalBytes,
-		startTime:     time.Now(),
-		bar:           NewProgressBar(totalBytes, "Transferring"),
+		totalFiles: totalFiles,
+		totalBytes: totalBytes,
+		startTime:  time.Now(),
+		bar:        NewProgressBar(totalBytes, "Transferring"),
 	}
 }
 

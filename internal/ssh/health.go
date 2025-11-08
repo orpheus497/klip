@@ -8,11 +8,11 @@ import (
 
 // HealthCheckResult contains the result of an SSH health check
 type HealthCheckResult struct {
-	Reachable      bool
-	Authenticated  bool
-	ResponseTime   time.Duration
-	Error          error
-	Message        string
+	Reachable     bool
+	Authenticated bool
+	ResponseTime  time.Duration
+	Error         error
+	Message       string
 }
 
 // HealthCheck performs a health check on an SSH connection
