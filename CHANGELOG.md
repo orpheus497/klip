@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2025-11-08
+
 ### Security
 
 - Fixed critical command injection vulnerability in SSH key deployment (DeployPublicKey function now uses SFTP instead of shell commands)
