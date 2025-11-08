@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Created connection helper module (internal/cli/connection.go) to eliminate code duplication across commands
+- Created audit logging system (internal/logger/audit.go) for security event tracking
+- Added profile validation command (klip profile validate <profile>) to test configurations without connecting
+- Added profile editing command (klip profile edit <profile>) for interactive profile modification
 - Added ValidateExcludePattern function for secure rsync pattern validation
 - Added ValidatePort, ValidateHostname, ValidateUsername validation functions
 - Added ValidateSSHKeyPath with permission checks (0600) and format validation
@@ -27,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added toUnixPath helper function for consistent remote path handling
 - Created legacy/ directory structure for historical script preservation
 - Added comprehensive security-focused path validation throughout transfer operations
+- Added ConnectionHelper for centralized SSH client creation and backend management
+- Added AuditLogger for JSON-formatted security event logging with XDG compliance
 
 ### Fixed
 
@@ -61,11 +67,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- Created internal/cli/connection.go for shared connection setup logic
+- Created internal/logger/audit.go for security audit logging
 - Enhanced internal/config/validation.go with comprehensive validation functions
 - Enhanced internal/transfer/validation.go with ValidateExcludePattern and improved cleanup
 - Enhanced internal/ui/prompts.go with sanitization for all user inputs
 - Updated internal/ssh/keys.go to use github.com/pkg/sftp for secure key deployment
 - Improved error handling and logging throughout validation functions
+- Added NewConnectionHelper to centralize profile selection and backend detection
+- Added CreateSSHClient to standardize SSH client creation across all commands
 
 ## [2.1.0] - 2025-11-08
 
