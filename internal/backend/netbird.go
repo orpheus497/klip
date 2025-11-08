@@ -155,8 +155,8 @@ func parseNetBirdStatus(output string) netBirdStatusInfo {
 
 		// Extract local IP
 		if strings.Contains(strings.ToLower(line), "netbird ip:") ||
-		   strings.Contains(strings.ToLower(line), "local ip:") ||
-		   strings.Contains(strings.ToLower(line), "interface ip:") {
+			strings.Contains(strings.ToLower(line), "local ip:") ||
+			strings.Contains(strings.ToLower(line), "interface ip:") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
 				info.localIP = strings.TrimSpace(parts[1])

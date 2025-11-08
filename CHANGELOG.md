@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-11-08
+
+### Security
+
+- Implemented proper SSH host key verification system to replace InsecureIgnoreHostKey
+- Added known_hosts file management with XDG Base Directory compliance
+- Added interactive host key acceptance prompts with fingerprint display
+- Implemented path traversal protection for file transfers
+- Added comprehensive path validation and sanitization for source and destination paths
+
+### Added
+
+- Created structured logging system using log/slog standard library
+- Added common CLI flags package to eliminate code duplication across commands
+- Added shell completion generation script for Bash, Zsh, Fish, and PowerShell
+- Added CONTRIBUTING.md with comprehensive contribution guidelines
+- Added .editorconfig for consistent code formatting across editors
+- Added .gitignore file to protect repository from accidental commits
+- Implemented parallel backend detection for faster startup
+- Added GetLogFilePath function for XDG-compliant log file locations
+- Added comprehensive path validation functions (ValidatePath, SanitizePath, IsPathSafe)
+- Added path validation for transfer operations (ValidateTransferPaths)
+- Added host key management functions (AddKnownHost, RemoveKnownHost, VerifyHostKey)
+- Added FormatFingerprint function for human-readable SSH key fingerprints
+- Added shell completion installation instructions to README
+
+### Fixed
+
+- Fixed PrintJSON function to use proper JSON encoding instead of fmt.Printf
+- Fixed potential panic in normalizePath when processing paths shorter than 2 characters
+- Corrected README dependency list to remove non-existent gokrazy/rsync
+- Added external tools documentation (rsync, ssh) as system requirements
+- Fixed stderr handling in rsync transfer to properly capture error messages
+
+### Changed
+
+- Updated SSH client to use NewHostKeyCallback for secure host key verification
+- Enhanced backend detector to check backends in parallel using goroutines
+- Improved transfer path validation with security-focused checks
+- Refactored normalizePath to include bounds checking before string slicing
+- Updated README with accurate dependency information and versions
+- Enhanced README Contributing section with link to CONTRIBUTING.md
+- Improved project documentation structure
+
+### Documentation
+
+- Added comprehensive CONTRIBUTING.md covering development workflow and code style
+- Added .editorconfig for editor configuration consistency
+- Updated README with shell completion installation instructions
+- Corrected dependency attribution to reflect actual go.mod contents
+- Added external tools section documenting rsync and SSH requirements
+- Created detailed audit documentation in .dev-docs/01-Initial_Audit.md
+- Created remediation blueprint in .dev-docs/02-Remediation_Blueprint.md
+
+### Internal
+
+- Created internal/logger package for structured logging
+- Created internal/cli package for common flag definitions
+- Created internal/ssh/hostkeys.go for host key management
+- Created internal/transfer/validation.go for path security
+- Added comprehensive test coverage for logger package
+- Improved error messages throughout codebase
+
 ## [2.0.0] - 2025-01-08
 
 ### Added

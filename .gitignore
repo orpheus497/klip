@@ -1,0 +1,171 @@
+# klip - Git Ignore File
+# Created by orpheus497
+
+# AI Development Documentation
+.dev-docs/
+
+# Build Artifacts
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go Build Cache
+.cache/
+
+# Binaries
+klip
+klipc
+klipr
+
+# Test Binary, Built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.cover
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Configuration files (user-specific)
+config.yaml
+config.yml
+*.local.yaml
+*.local.yml
+
+# SSH Keys (should never be committed)
+*.pem
+*.key
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+*.ppk
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# OS-Specific Files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# IDE and Editor Files
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains (GoLand, IntelliJ)
+.idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+*.swp
+*.swo
+*~
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Debug and Profiling
+debug
+*.pprof
+*.prof
+pprof.*
+mem.pprof
+cpu.pprof
+
+# Release Archives
+*.tar.gz
+*.zip
+*.tar
+*.tar.bz2
+*.tar.xz
+
+# Documentation Build Artifacts
+docs/_build/
+site/
+
+# Local Testing
+test-data/
+testdata/local/

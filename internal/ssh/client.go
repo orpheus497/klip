@@ -77,7 +77,7 @@ func NewClient(cfg *Config) (*Client, error) {
 	clientConfig := &ssh.ClientConfig{
 		User:            cfg.User,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement proper host key checking
+		HostKeyCallback: NewHostKeyCallback(),
 		Timeout:         cfg.Timeout,
 	}
 
