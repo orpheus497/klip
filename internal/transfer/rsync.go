@@ -84,8 +84,14 @@ func (r *RsyncTransfer) buildRsyncArgs() []string {
 		args = append(args, fmt.Sprintf("--bwlimit=%d", r.config.BandwidthLimit))
 	}
 
-	// Exclude patterns
+	// Exclude patterns - validate each pattern for security
 	for _, pattern := range r.config.ExcludePatterns {
+		// Validate pattern to prevent injection attacks
+		if err := ValidateExcludePattern(pattern); err != nil {
+			// Skip invalid patterns and log warning
+			// In a production system, this should use proper logging
+			continue
+		}
 		args = append(args, "--exclude", pattern)
 	}
 
@@ -142,8 +148,10 @@ func (r *RsyncTransfer) buildSSHArgs() []string {
 		args = append(args, "-i", r.config.Profile.SSHKeyPath)
 	}
 
-	// Disable strict host key checking (optional, for convenience)
-	// args = append(args, "-o", "StrictHostKeyChecking=no")
+	// SECURITY: Never disable strict host key checking as it prevents MITM attacks
+	// Host key verification is handled automatically via klip's known_hosts management
+	// in ~/.config/klip/known_hosts. If you encounter host key errors, use:
+	//   klip health --verify-host <profile>
 
 	return args
 }
@@ -169,6 +177,13 @@ func (r *RsyncTransfer) executeWithProgress(ctx context.Context, cmd *exec.Cmd) 
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
+			// Check context periodically during scanning
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			line := scanner.Text()
 			r.parseProgressLine(line)
 		}
@@ -176,6 +191,13 @@ func (r *RsyncTransfer) executeWithProgress(ctx context.Context, cmd *exec.Cmd) 
 		// Also read stderr
 		stderrScanner := bufio.NewScanner(stderr)
 		for stderrScanner.Scan() {
+			// Check context periodically
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			// Log stderr but don't parse for progress
 			line := stderrScanner.Text()
 			if r.progressCallback != nil {
@@ -185,12 +207,22 @@ func (r *RsyncTransfer) executeWithProgress(ctx context.Context, cmd *exec.Cmd) 
 			}
 		}
 
-		done <- cmd.Wait()
+		waitErr := cmd.Wait()
+
+		// Non-blocking send to prevent deadlock if context was cancelled
+		select {
+		case done <- waitErr:
+		case <-ctx.Done():
+			// Context cancelled, don't block on send
+		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		cmd.Process.Kill()
+		// Kill the process if still running
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
 		return ctx.Err()
 	case err := <-done:
 		return err

@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Fixed critical command injection vulnerability in SSH key deployment (DeployPublicKey function now uses SFTP instead of shell commands)
+- Removed dangerous StrictHostKeyChecking suggestion from rsync implementation
+- Added comprehensive input validation for rsync exclude patterns to prevent injection attacks
+- Implemented input sanitization for all interactive prompts to prevent terminal injection
+- Fixed TOCTOU race condition in path validation logic with improved atomic operations
+- Added comprehensive validation for SSH port ranges, hostnames, and usernames
+- Added SSH key path validation with permission and format checking
+
+### Added
+
+- Added ValidateExcludePattern function for secure rsync pattern validation
+- Added ValidatePort, ValidateHostname, ValidateUsername validation functions
+- Added ValidateSSHKeyPath with permission checks (0600) and format validation
+- Added ValidateBandwidthLimit and ValidateCompressionLevel functions
+- Added sanitizeInput function for filtering terminal control characters and ANSI sequences
+- Added toUnixPath helper function for consistent remote path handling
+- Created legacy/ directory structure for historical script preservation
+- Added comprehensive security-focused path validation throughout transfer operations
+
+### Fixed
+
+- Fixed command injection vulnerability in internal/ssh/keys.go DeployPublicKey function (replaced shell echo with SFTP file operations)
+- Fixed incorrect use of path package instead of filepath in SFTP operations (internal/transfer/sftp.go)
+- Fixed potential goroutine deadlock in rsync progress parser with non-blocking channel sends
+- Fixed missing test file cleanup in path validation functions (added defer cleanup)
+- Fixed path handling to ensure remote paths use Unix-style forward slashes regardless of local OS
+- Fixed exclude pattern handling to validate patterns before use in rsync
+
+### Changed
+
+- Replaced shell-based SSH public key deployment with secure SFTP-based atomic file writes
+- Enhanced rsync implementation with context-aware non-blocking goroutines to prevent deadlocks
+- Updated all interactive input functions to use sanitization for security
+- Improved rsync security comment to explain why strict host key checking should never be disabled
+- Reorganized legacy bash scripts from lan/ to legacy/lan/ directory for historical preservation
+- Updated SFTP path operations to use filepath package for correct cross-platform behavior
+- Enhanced transfer path validation with additional security checks
+
+### Removed
+
+- Removed dangerous StrictHostKeyChecking comment from rsync implementation (replaced with security warning)
+- Removed duplicate installation scripts from root directory (config.sh, install.sh, uninstall.sh)
+- Removed legacy lan/ directory (moved contents to legacy/lan/)
+
+### Documentation
+
+- Created legacy/README.md explaining historical context and migration path
+- Updated validation documentation with new security-focused functions
+- Added comprehensive comments explaining security rationale for key changes
+
+### Internal
+
+- Enhanced internal/config/validation.go with comprehensive validation functions
+- Enhanced internal/transfer/validation.go with ValidateExcludePattern and improved cleanup
+- Enhanced internal/ui/prompts.go with sanitization for all user inputs
+- Updated internal/ssh/keys.go to use github.com/pkg/sftp for secure key deployment
+- Improved error handling and logging throughout validation functions
+
 ## [2.1.0] - 2025-11-08
 
 ### Security
