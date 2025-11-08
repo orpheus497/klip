@@ -2,6 +2,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -183,8 +184,11 @@ func ConfirmDefaultNo(prompt string) bool {
 
 // PrintJSON prints data as formatted JSON
 func PrintJSON(data interface{}) error {
-	// Note: This is a simplified version; in production, use encoding/json
-	fmt.Printf("%+v\n", data)
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(data); err != nil {
+		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
 	return nil
 }
 

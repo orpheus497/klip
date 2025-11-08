@@ -17,7 +17,7 @@ func NewDetector(registry *Registry) *Detector {
 	return &Detector{registry: registry}
 }
 
-// DetectBest finds the best available and connected backend
+// DetectBest finds the best available and connected backend using parallel detection
 func (d *Detector) DetectBest(ctx context.Context) (Backend, error) {
 	backends := d.registry.List()
 
@@ -26,20 +26,53 @@ func (d *Detector) DetectBest(ctx context.Context) (Backend, error) {
 		return backends[i].Priority() > backends[j].Priority()
 	})
 
-	// Find the first available and connected backend
+	// Result structure for parallel detection
+	type backendResult struct {
+		backend   Backend
+		available bool
+		connected bool
+	}
+
+	// Channel for results
+	results := make(chan backendResult, len(backends))
+
+	// Check backends in parallel
+	for _, backend := range backends {
+		go func(b Backend) {
+			result := backendResult{backend: b}
+			result.available = b.IsAvailable(ctx)
+			if result.available {
+				result.connected = b.IsConnected(ctx)
+			}
+			results <- result
+		}(backend)
+	}
+
+	// Collect results
 	var availableBackends []Backend
 	var connectedBackend Backend
 
-	for _, backend := range backends {
-		if !backend.IsAvailable(ctx) {
-			continue
-		}
+	for i := 0; i < len(backends); i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case result := <-results:
+			if !result.available {
+				continue
+			}
 
-		availableBackends = append(availableBackends, backend)
+			availableBackends = append(availableBackends, result.backend)
 
-		if backend.IsConnected(ctx) {
-			connectedBackend = backend
-			break
+			// If we found a connected backend and don't have one yet, save it
+			// We need to check priority later
+			if result.connected && connectedBackend == nil {
+				connectedBackend = result.backend
+			} else if result.connected && connectedBackend != nil {
+				// Choose higher priority backend
+				if result.backend.Priority() > connectedBackend.Priority() {
+					connectedBackend = result.backend
+				}
+			}
 		}
 	}
 
@@ -50,6 +83,10 @@ func (d *Detector) DetectBest(ctx context.Context) (Backend, error) {
 
 	// If no connected backend, but we have available ones, return the highest priority
 	if len(availableBackends) > 0 {
+		// Sort by priority
+		sort.Slice(availableBackends, func(i, j int) bool {
+			return availableBackends[i].Priority() > availableBackends[j].Priority()
+		})
 		return availableBackends[0], nil
 	}
 

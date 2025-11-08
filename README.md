@@ -42,6 +42,32 @@ chmod +x scripts/install.sh
 
 Download pre-built binaries for your platform from the releases page.
 
+#### Shell Completion (Optional)
+
+Enable command-line completion for easier usage:
+
+```bash
+# Build first
+make build
+
+# Generate completions
+./scripts/generate-completions.sh
+
+# Bash
+sudo cp scripts/completion/klip.bash /etc/bash_completion.d/klip
+
+# Zsh
+mkdir -p ~/.zsh/completion
+cp scripts/completion/_klip ~/.zsh/completion/
+# Add to ~/.zshrc: fpath=(~/.zsh/completion $fpath)
+
+# Fish
+cp scripts/completion/klip.fish ~/.config/fish/completions/
+
+# PowerShell
+# Add to profile: . /path/to/scripts/completion/klip.ps1
+```
+
 ### Initial Setup
 
 ```bash
@@ -258,17 +284,21 @@ Your old configuration at `~/.LINK/config.sh` will be imported as profiles.
 All dependencies are FOSS with permissive licenses:
 
 - [github.com/spf13/cobra](https://github.com/spf13/cobra) - CLI framework (Apache-2.0)
-- [github.com/spf13/viper](https://github.com/spf13/viper) - Configuration (MIT)
 - [github.com/adrg/xdg](https://github.com/adrg/xdg) - XDG support (MIT)
-- [golang.org/x/crypto/ssh](https://pkg.go.dev/golang.org/x/crypto/ssh) - SSH client (BSD-3-Clause)
+- [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto) - SSH client (BSD-3-Clause)
+- [golang.org/x/term](https://pkg.go.dev/golang.org/x/term) - Terminal operations (BSD-3-Clause)
 - [github.com/pkg/sftp](https://github.com/pkg/sftp) - SFTP (BSD-2-Clause)
-- [github.com/gokrazy/rsync](https://github.com/gokrazy/rsync) - Rsync (BSD-3-Clause)
 - [github.com/fatih/color](https://github.com/fatih/color) - Terminal colors (MIT)
-- [github.com/schollz/progressbar](https://github.com/schollz/progressbar) - Progress bars (MIT)
+- [github.com/schollz/progressbar/v3](https://github.com/schollz/progressbar) - Progress bars (MIT)
+- [gopkg.in/yaml.v3](https://github.com/go-yaml/yaml) - YAML parsing (MIT)
+
+**External Tools Required:**
+- `rsync` - Fast file transfer program (GPL-3.0, external binary)
+- `ssh` - SSH client for connections (BSD, system package)
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on our code of conduct, development process, and how to submit pull requests.
 
 ## License
 

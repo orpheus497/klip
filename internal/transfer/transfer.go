@@ -106,11 +106,9 @@ func NewTransfer(cfg *TransferConfig) (Transfer, error) {
 		cfg.Method = "rsync"
 	}
 
-	// Validate source path for push operations
-	if cfg.Direction == DirectionPush {
-		if _, err := os.Stat(cfg.SourcePath); os.IsNotExist(err) {
-			return nil, fmt.Errorf("source path does not exist: %s", cfg.SourcePath)
-		}
+	// Validate transfer paths for security
+	if err := ValidateTransferPaths(cfg.SourcePath, cfg.DestPath, cfg.Direction); err != nil {
+		return nil, fmt.Errorf("path validation failed: %w", err)
 	}
 
 	// Normalize paths
@@ -130,7 +128,7 @@ func NewTransfer(cfg *TransferConfig) (Transfer, error) {
 // normalizePath normalizes a file path
 func normalizePath(path string) string {
 	// Expand ~ to home directory
-	if path[:2] == "~/" {
+	if len(path) >= 2 && path[:2] == "~/" {
 		homeDir, err := os.UserHomeDir()
 		if err == nil {
 			path = filepath.Join(homeDir, path[2:])
