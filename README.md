@@ -263,17 +263,6 @@ Open-source WireGuard-based mesh VPN.
 # See: https://netbird.io/docs/getting-started/installation
 ```
 
-## Migration from Legacy LINK
-
-If you have existing LINK bash scripts, klip can automatically migrate your configuration:
-
-```bash
-klip init
-# Choose "yes" when prompted to migrate
-```
-
-Your old configuration at `~/.LINK/config.sh` will be imported as profiles.
-
 ## Documentation
 
 - [Technical Documentation](DOCUMENTATION.md) - Comprehensive technical reference
