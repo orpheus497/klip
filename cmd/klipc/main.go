@@ -8,9 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/orpheus497/klip/internal/backend"
-	"github.com/orpheus497/klip/internal/config"
-	"github.com/orpheus497/klip/internal/ssh"
+	"github.com/orpheus497/klip/internal/cli"
+	"github.com/orpheus497/klip/internal/logger"
 	"github.com/orpheus497/klip/internal/transfer"
 	"github.com/orpheus497/klip/internal/ui"
 	"github.com/orpheus497/klip/internal/version"
@@ -80,133 +79,84 @@ func runCopy(cmd *cobra.Command, args []string) {
 		destPath = sourcePath
 	}
 
-	// Load configuration
-	cfg, err := config.Load()
+	// Initialize audit logger (enabled by default for security tracking)
+	auditLogger, err := logger.NewAuditLogger(true)
 	if err != nil {
-		ui.PrintError("Failed to load configuration: %v", err)
+		ui.PrintWarning("Failed to initialize audit logger: %v", err)
+		// Create disabled logger as fallback
+		auditLogger, _ = logger.NewAuditLogger(false)
+	}
+	defer auditLogger.Close()
+
+	// Create connection helper (centralizes connection setup)
+	helper, err := cli.NewConnectionHelper(cli.ConnectionConfig{
+		ProfileName: profileName,
+		BackendName: backendName,
+		Timeout:     timeout,
+		Verbose:     verbose,
+	})
+	if err != nil {
+		ui.PrintError("Failed to initialize connection: %v", err)
 		ui.PrintInfo("Run 'klip init' to create initial configuration")
 		os.Exit(1)
 	}
 
-	// Select profile
-	var profile *config.Profile
-
-	if profileName != "" {
-		profile, err = cfg.GetProfile(profileName)
-		if err != nil {
-			ui.PrintError("Profile not found: %s", profileName)
-			os.Exit(1)
-		}
-	} else {
-		// Use current profile or interactive selection
-		if cfg.CurrentProfile != "" {
-			profile, err = cfg.GetCurrentProfile()
-			if err != nil {
-				profile = nil
-			}
-		}
-
-		if profile == nil {
-			selector := ui.NewProfileSelector(cfg)
-			profile, _, err = selector.SelectProfile()
-			if err != nil {
-				ui.PrintError("Failed to select profile: %v", err)
-				os.Exit(1)
-			}
-		}
-	}
-
-	// Override backend if specified
-	if backendName != "" {
-		profile = profile.Clone()
-		profile.Backend = config.BackendType(backendName)
-	}
-
-	// Override method if specified
+	// Override transfer method if specified
 	if method != "" {
-		profile.TransferOptions.Method = method
+		helper.Profile.TransferOptions.Method = method
 	}
 
 	// Override compression if specified
 	if cmd.Flags().Changed("compress") {
-		profile.TransferOptions.CompressionLevel = compressionLevel
+		helper.Profile.TransferOptions.CompressionLevel = compressionLevel
 	}
 
-	ui.PrintInfo("Copying to: %s@%s:%s", profile.RemoteUser, profile.RemoteHost, destPath)
+	ui.PrintInfo("Copying to: %s@%s:%s", helper.Profile.RemoteUser, helper.Profile.RemoteHost, destPath)
 	if dryRun {
 		ui.PrintWarning("DRY RUN - No files will be transferred")
 	}
 
-	// Select backend
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancel()
+	// Create context with timeout
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
+	}
 
-	registry := backend.NewRegistry()
-	detector := backend.NewDetector(registry)
-
-	selectedBackend, err := detector.SelectBackend(ctx, string(profile.Backend))
+	// Create SSH client using connection helper
+	client, err := helper.CreateSSHClient(ctx, timeout)
 	if err != nil {
-		ui.PrintError("Failed to select backend: %v", err)
+		// Log failed connection attempt
+		_ = auditLogger.LogTransfer(
+			helper.Profile.Name,
+			helper.Profile.RemoteUser,
+			helper.Profile.RemoteHost,
+			helper.Backend.Name(),
+			"push",
+			sourcePath,
+			destPath,
+			"failed",
+			err,
+		)
+		ui.PrintError("Connection failed: %v", err)
 		os.Exit(1)
 	}
-
-	// Resolve host
-	resolvedHost := profile.RemoteHost
-
-	if selectedBackend.Name() != "lan" {
-		if verbose {
-			ui.PrintInfo("Resolving host via %s...", selectedBackend.Name())
-		}
-
-		ip, err := detector.ResolveHost(ctx, selectedBackend, profile.RemoteHost)
-		if err != nil {
-			ui.PrintWarning("Failed to resolve via %s, using hostname", selectedBackend.Name())
-		} else {
-			resolvedHost = ip
-			if verbose {
-				ui.PrintInfo("Resolved to: %s", resolvedHost)
-			}
-		}
-	}
-
-	// Create SSH client
-	sshConfig := &ssh.Config{
-		Host:        resolvedHost,
-		Port:        profile.SSHPort,
-		User:        profile.RemoteUser,
-		KeyPath:     profile.SSHKeyPath,
-		UsePassword: profile.UsePassword,
-		Timeout:     time.Duration(timeout) * time.Second,
-	}
-
-	client, err := ssh.NewClient(sshConfig)
-	if err != nil {
-		ui.PrintError("Failed to create SSH client: %v", err)
-		os.Exit(1)
-	}
-
-	// Connect if using SFTP
-	if profile.TransferOptions.Method == "sftp" {
-		if err := client.Connect(ctx); err != nil {
-			ui.PrintError("Connection failed: %v", err)
-			os.Exit(1)
-		}
-		defer client.Close()
-	}
+	defer client.Close()
 
 	// Configure transfer
 	transferConfig := &transfer.TransferConfig{
 		SSHClient:           client,
-		Profile:             profile,
+		Profile:             helper.Profile,
 		SourcePath:          sourcePath,
 		DestPath:            destPath,
 		Direction:           transfer.DirectionPush,
-		Method:              profile.TransferOptions.Method,
-		CompressionLevel:    profile.TransferOptions.CompressionLevel,
-		ExcludePatterns:     profile.TransferOptions.ExcludePatterns,
-		BandwidthLimit:      profile.TransferOptions.BandwidthLimit,
-		PreservePermissions: profile.TransferOptions.PreservePermissions,
-		DeleteAfterTransfer: profile.TransferOptions.DeleteAfterTransfer,
+		Method:              helper.Profile.TransferOptions.Method,
+		CompressionLevel:    helper.Profile.TransferOptions.CompressionLevel,
+		ExcludePatterns:     helper.Profile.TransferOptions.ExcludePatterns,
+		BandwidthLimit:      helper.Profile.TransferOptions.BandwidthLimit,
+		PreservePermissions: helper.Profile.TransferOptions.PreservePermissions,
+		DeleteAfterTransfer: helper.Profile.TransferOptions.DeleteAfterTransfer,
 		DryRun:              dryRun,
 		ShowProgress:        true,
 	}
@@ -214,6 +164,18 @@ func runCopy(cmd *cobra.Command, args []string) {
 	// Create transfer
 	xfer, err := transfer.NewTransfer(transferConfig)
 	if err != nil {
+		// Log failed transfer setup
+		_ = auditLogger.LogTransfer(
+			helper.Profile.Name,
+			helper.Profile.RemoteUser,
+			helper.Profile.RemoteHost,
+			helper.Backend.Name(),
+			"push",
+			sourcePath,
+			destPath,
+			"failed",
+			err,
+		)
 		ui.PrintError("Failed to create transfer: %v", err)
 		os.Exit(1)
 	}
@@ -230,12 +192,35 @@ func runCopy(cmd *cobra.Command, args []string) {
 	// Execute transfer
 	startTime := time.Now()
 
-	if err := xfer.Execute(ctx); err != nil {
-		ui.PrintError("Transfer failed: %v", err)
-		os.Exit(1)
+	transferErr := xfer.Execute(ctx)
+	elapsed := time.Since(startTime)
+
+	// Determine transfer status for audit log
+	status := "success"
+	if transferErr != nil {
+		status = "failed"
+	}
+	if dryRun {
+		status = "dry_run"
 	}
 
-	elapsed := time.Since(startTime)
+	// Log transfer result
+	_ = auditLogger.LogTransfer(
+		helper.Profile.Name,
+		helper.Profile.RemoteUser,
+		helper.Profile.RemoteHost,
+		helper.Backend.Name(),
+		"push",
+		sourcePath,
+		destPath,
+		status,
+		transferErr,
+	)
+
+	if transferErr != nil {
+		ui.PrintError("Transfer failed: %v", transferErr)
+		os.Exit(1)
+	}
 
 	if dryRun {
 		ui.PrintSuccess("Dry run completed in %.2fs", elapsed.Seconds())

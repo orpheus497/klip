@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -152,7 +153,8 @@ func ValidateDestPath(path string) error {
 					return fmt.Errorf("destination directory is not writable: %w", err)
 				}
 				f.Close()
-				os.Remove(testFile)
+				// Ensure test file cleanup
+				defer os.Remove(testFile)
 			}
 		} else if os.IsNotExist(err) {
 			// Path doesn't exist - verify parent directory exists and is writable
@@ -170,7 +172,8 @@ func ValidateDestPath(path string) error {
 				return fmt.Errorf("destination parent directory is not writable: %w", err)
 			}
 			f.Close()
-			os.Remove(testFile)
+			// Ensure test file cleanup
+			defer os.Remove(testFile)
 		} else {
 			return fmt.Errorf("cannot access destination path: %w", err)
 		}
@@ -242,4 +245,46 @@ func IsWithinDirectory(basePath, targetPath string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// ValidateExcludePattern validates rsync exclude patterns for security
+// Prevents command injection and path traversal via malicious patterns
+func ValidateExcludePattern(pattern string) error {
+	if pattern == "" {
+		return fmt.Errorf("pattern cannot be empty")
+	}
+
+	// Maximum length check to prevent resource exhaustion
+	if len(pattern) > 1024 {
+		return fmt.Errorf("pattern exceeds maximum length of 1024 characters")
+	}
+
+	// Check for null bytes (can confuse rsync)
+	if strings.Contains(pattern, "\x00") {
+		return fmt.Errorf("pattern contains null byte")
+	}
+
+	// Allow only safe characters for rsync patterns:
+	// - Alphanumeric: a-z, A-Z, 0-9
+	// - Wildcards: *, ?
+	// - Path separators: /
+	// - Special chars: - _ . [ ] { }
+	// This prevents shell metacharacters while allowing standard rsync pattern syntax
+	validPattern := regexp.MustCompile(`^[a-zA-Z0-9_.*?/\-\[\]{}]+$`)
+	if !validPattern.MatchString(pattern) {
+		return fmt.Errorf("pattern contains disallowed characters (only alphanumeric, ._*?/-[]{{}} allowed)")
+	}
+
+	// Prevent path traversal via .. in patterns
+	if strings.Contains(pattern, "..") {
+		return fmt.Errorf("pattern contains path traversal (..)")
+	}
+
+	// Prevent absolute paths in patterns (security best practice)
+	// Rsync patterns should be relative to the transfer root
+	if filepath.IsAbs(pattern) {
+		return fmt.Errorf("pattern cannot be an absolute path")
+	}
+
+	return nil
 }

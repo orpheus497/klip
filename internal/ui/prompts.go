@@ -4,11 +4,42 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"golang.org/x/term"
 )
+
+// sanitizeInput removes control characters and ANSI escape sequences from user input
+// This prevents terminal injection attacks and ensures clean input
+func sanitizeInput(s string) string {
+	// Remove control characters (0x00-0x1F, 0x7F) except tab and newline
+	var result strings.Builder
+	for _, r := range s {
+		// Keep printable characters and safe whitespace (space, tab, newline)
+		if unicode.IsPrint(r) || r == '\t' || r == '\n' || r == ' ' {
+			result.WriteRune(r)
+		}
+	}
+
+	s = result.String()
+
+	// Remove ANSI escape sequences (e.g., \x1b[31m for colors)
+	ansiEscape := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	s = ansiEscape.ReplaceAllString(s, "")
+
+	// Remove CSI sequences (e.g., \x1b]0;title\x07)
+	csiSequence := regexp.MustCompile(`\x1b\][^\x07]*\x07`)
+	s = csiSequence.ReplaceAllString(s, "")
+
+	// Remove other escape sequences
+	otherEscape := regexp.MustCompile(`\x1b[^\[]*`)
+	s = otherEscape.ReplaceAllString(s, "")
+
+	return strings.TrimSpace(s)
+}
 
 // PromptString prompts for a string input
 func PromptString(prompt string, defaultValue string) (string, error) {
@@ -24,7 +55,8 @@ func PromptString(prompt string, defaultValue string) (string, error) {
 		return "", err
 	}
 
-	input = strings.TrimSpace(input)
+	// Sanitize input to remove control characters and escape sequences
+	input = sanitizeInput(input)
 
 	if input == "" && defaultValue != "" {
 		return defaultValue, nil
@@ -72,7 +104,8 @@ func PromptBool(prompt string, defaultValue bool) (bool, error) {
 		return false, err
 	}
 
-	input = strings.ToLower(strings.TrimSpace(input))
+	// Sanitize and normalize input
+	input = strings.ToLower(sanitizeInput(input))
 
 	if input == "" {
 		return defaultValue, nil
@@ -99,7 +132,10 @@ func PromptPassword(prompt string) (string, error) {
 
 	fmt.Println() // Print newline after password input
 
-	return string(passwordBytes), nil
+	// Sanitize password input (though it won't be displayed)
+	password := sanitizeInput(string(passwordBytes))
+
+	return password, nil
 }
 
 // PromptChoice prompts for a choice from a list

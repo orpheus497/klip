@@ -211,6 +211,22 @@ func profileCmd() *cobra.Command {
 		Run:   runProfileSetCurrent,
 	})
 
+	cmd.AddCommand(&cobra.Command{
+		Use:   "validate <profile>",
+		Short: "Validate a profile configuration",
+		Long:  "Validates profile settings and tests connectivity without establishing a full connection",
+		Args:  cobra.ExactArgs(1),
+		Run:   runProfileValidate,
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "edit <profile>",
+		Short: "Edit a profile interactively",
+		Long:  "Opens an interactive editor to modify profile settings",
+		Args:  cobra.ExactArgs(1),
+		Run:   runProfileEdit,
+	})
+
 	return cmd
 }
 
@@ -475,4 +491,145 @@ func runInit(cmd *cobra.Command, args []string) {
 
 	configPath, _ := config.ConfigPath()
 	ui.PrintSuccess("Configuration initialized: %s", configPath)
+}
+
+func runProfileValidate(cmd *cobra.Command, args []string) {
+	profileName := args[0]
+
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		ui.PrintError("Failed to load configuration: %v", err)
+		os.Exit(1)
+	}
+
+	// Get profile
+	profile, err := cfg.GetProfile(profileName)
+	if err != nil {
+		ui.PrintError("Profile not found: %s", profileName)
+		os.Exit(1)
+	}
+
+	ui.PrintHeader(fmt.Sprintf("Validating Profile: %s", profileName))
+	ui.PrintEmptyLine()
+
+	// Validate profile configuration
+	ui.PrintInfo("Checking profile configuration...")
+	if err := profile.Validate(); err != nil {
+		ui.PrintError("Profile validation failed: %v", err)
+		os.Exit(1)
+	}
+	ui.PrintSuccess("Profile configuration is valid")
+
+	// Validate port
+	ui.PrintInfo("Validating SSH port...")
+	if err := config.ValidatePort(profile.SSHPort); err != nil {
+		ui.PrintError("Invalid port: %v", err)
+		os.Exit(1)
+	}
+	ui.PrintSuccess("Port %d is valid", profile.SSHPort)
+
+	// Validate hostname
+	ui.PrintInfo("Validating hostname...")
+	if err := config.ValidateHostname(profile.RemoteHost); err != nil {
+		ui.PrintError("Invalid hostname: %v", err)
+		os.Exit(1)
+	}
+	ui.PrintSuccess("Hostname %s is valid", profile.RemoteHost)
+
+	// Validate username
+	ui.PrintInfo("Validating username...")
+	if err := config.ValidateUsername(profile.RemoteUser); err != nil {
+		ui.PrintError("Invalid username: %v", err)
+		os.Exit(1)
+	}
+	ui.PrintSuccess("Username %s is valid", profile.RemoteUser)
+
+	// Validate SSH key if specified
+	if profile.SSHKeyPath != "" {
+		ui.PrintInfo("Validating SSH key...")
+		if err := config.ValidateSSHKeyPath(profile.SSHKeyPath); err != nil {
+			ui.PrintError("Invalid SSH key: %v", err)
+			os.Exit(1)
+		}
+		ui.PrintSuccess("SSH key is valid")
+	}
+
+	// Check backend availability
+	ui.PrintInfo("Checking backend availability...")
+	ctx := context.Background()
+	detector := backend.NewDetector(nil)
+	selectedBackend, err := detector.SelectBackend(ctx, string(profile.Backend))
+	if err != nil {
+		ui.PrintError("Backend detection failed: %v", err)
+		os.Exit(1)
+	}
+
+	if !selectedBackend.IsAvailable(ctx) {
+		ui.PrintWarning("Backend %s is not available", selectedBackend.Name())
+	} else {
+		ui.PrintSuccess("Backend %s is available", selectedBackend.Name())
+
+		// Check if backend is connected
+		if selectedBackend.IsConnected(ctx) {
+			ui.PrintSuccess("Backend %s is connected", selectedBackend.Name())
+
+			// Try to resolve hostname
+			ui.PrintInfo("Resolving hostname via %s...", selectedBackend.Name())
+			resolvedHost, err := selectedBackend.GetPeerIP(ctx, profile.RemoteHost)
+			if err != nil {
+				ui.PrintWarning("Failed to resolve hostname: %v", err)
+			} else {
+				ui.PrintSuccess("Hostname resolved to: %s", resolvedHost)
+			}
+		} else {
+			ui.PrintWarning("Backend %s is not connected", selectedBackend.Name())
+		}
+	}
+
+	ui.PrintEmptyLine()
+	ui.PrintSuccess("Profile validation complete!")
+	ui.PrintInfo("Profile %s appears to be properly configured", profileName)
+}
+
+func runProfileEdit(cmd *cobra.Command, args []string) {
+	profileName := args[0]
+
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		ui.PrintError("Failed to load configuration: %v", err)
+		os.Exit(1)
+	}
+
+	// Get profile
+	profile, err := cfg.GetProfile(profileName)
+	if err != nil {
+		ui.PrintError("Profile not found: %s", profileName)
+		os.Exit(1)
+	}
+
+	// Edit profile interactively (modifies profile in place)
+	if err := ui.EditProfileInteractive(profile); err != nil {
+		ui.PrintError("Failed to edit profile: %v", err)
+		os.Exit(1)
+	}
+
+	// Validate updated profile
+	if err := profile.Validate(); err != nil {
+		ui.PrintError("Updated profile is invalid: %v", err)
+		ui.PrintWarning("Changes not saved")
+		os.Exit(1)
+	}
+
+	// Update profile in configuration
+	cfg.Profiles[profileName] = profile
+
+	// Save configuration
+	if err := cfg.Save(); err != nil {
+		ui.PrintError("Failed to save configuration: %v", err)
+		os.Exit(1)
+	}
+
+	ui.PrintSuccess("Profile %s updated successfully", profileName)
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/pkg/sftp"
@@ -99,9 +98,12 @@ func (s *SFTPTransfer) pushFile(ctx context.Context, client *sftp.Client, localP
 	}
 
 	// Create remote directory if needed
-	remoteDir := path.Dir(remotePath)
-	if err := client.MkdirAll(remoteDir); err != nil {
-		return fmt.Errorf("failed to create remote directory: %w", err)
+	// Use filepath.Dir for correct path handling, then convert to Unix style for remote
+	remoteDir := toUnixPath(filepath.Dir(remotePath))
+	if remoteDir != "" && remoteDir != "." {
+		if err := client.MkdirAll(remoteDir); err != nil {
+			return fmt.Errorf("failed to create remote directory: %w", err)
+		}
 	}
 
 	// Create remote file
@@ -280,4 +282,13 @@ func (s *SFTPTransfer) notifyProgress(info ProgressInfo) {
 	if s.progressCallback != nil {
 		s.progressCallback(info)
 	}
+}
+
+// toUnixPath converts a path to Unix-style forward slashes for remote paths
+// This ensures remote paths always use forward slashes regardless of local OS
+func toUnixPath(p string) string {
+	// Clean the path first to remove redundant separators
+	cleaned := filepath.Clean(p)
+	// Convert to forward slashes (Unix-style)
+	return filepath.ToSlash(cleaned)
 }

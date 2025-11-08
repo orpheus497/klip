@@ -3,7 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // ValidationError represents a configuration validation error
@@ -189,4 +193,181 @@ func SanitizeProfile(profile *Profile) {
 	profile.RemoteUser = strings.TrimSpace(profile.RemoteUser)
 	profile.RemoteHost = strings.TrimSpace(profile.RemoteHost)
 	profile.SSHKeyPath = strings.TrimSpace(profile.SSHKeyPath)
+}
+
+// ValidatePort checks if port is in valid range
+func ValidatePort(port int) error {
+	if port < 1 || port > 65535 {
+		return &ValidationError{
+			Field:   "ssh_port",
+			Message: fmt.Sprintf("port must be between 1 and 65535, got %d", port),
+		}
+	}
+	return nil
+}
+
+// ValidateHostname checks if hostname is valid format (RFC 1123)
+func ValidateHostname(hostname string) error {
+	if hostname == "" {
+		return &ValidationError{
+			Field:   "remote_host",
+			Message: "hostname cannot be empty",
+		}
+	}
+
+	// Maximum length check (RFC 1123)
+	if len(hostname) > 253 {
+		return &ValidationError{
+			Field:   "remote_host",
+			Message: "hostname exceeds maximum length of 253 characters",
+		}
+	}
+
+	// Check for valid characters: alphanumeric, hyphens, dots
+	// Allow IP addresses and hostnames
+	validHostname := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$`)
+	if !validHostname.MatchString(hostname) {
+		return &ValidationError{
+			Field:   "remote_host",
+			Message: "hostname contains invalid characters (only alphanumeric, hyphens, dots allowed)",
+		}
+	}
+
+	// No consecutive dots
+	if strings.Contains(hostname, "..") {
+		return &ValidationError{
+			Field:   "remote_host",
+			Message: "hostname cannot contain consecutive dots",
+		}
+	}
+
+	return nil
+}
+
+// ValidateUsername checks if username is valid (POSIX-style)
+func ValidateUsername(username string) error {
+	if username == "" {
+		return &ValidationError{
+			Field:   "remote_user",
+			Message: "username cannot be empty",
+		}
+	}
+
+	// Maximum length check (POSIX limit is 32 chars)
+	if len(username) > 32 {
+		return &ValidationError{
+			Field:   "remote_user",
+			Message: "username exceeds maximum length of 32 characters",
+		}
+	}
+
+	// POSIX username rules: start with letter or underscore,
+	// contain only lowercase alphanumeric, underscore, hyphen
+	validUsername := regexp.MustCompile(`^[a-z_][a-z0-9_-]*$`)
+	if !validUsername.MatchString(username) {
+		return &ValidationError{
+			Field:   "remote_user",
+			Message: "username must start with letter or underscore, contain only lowercase alphanumeric, underscore, hyphen",
+		}
+	}
+
+	return nil
+}
+
+// ValidateSSHKeyPath checks if SSH key exists and has correct permissions
+func ValidateSSHKeyPath(keyPath string) error {
+	if keyPath == "" {
+		return nil // Empty is OK, will use default keys
+	}
+
+	// Expand tilde to home directory
+	if strings.HasPrefix(keyPath, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return &ValidationError{
+				Field:   "ssh_key_path",
+				Message: "cannot determine home directory",
+			}
+		}
+		keyPath = filepath.Join(home, keyPath[2:])
+	}
+
+	// Check existence
+	info, err := os.Stat(keyPath)
+	if os.IsNotExist(err) {
+		return &ValidationError{
+			Field:   "ssh_key_path",
+			Message: fmt.Sprintf("SSH key not found: %s", keyPath),
+		}
+	}
+	if err != nil {
+		return &ValidationError{
+			Field:   "ssh_key_path",
+			Message: fmt.Sprintf("cannot access SSH key: %v", err),
+		}
+	}
+
+	// Check it's a regular file
+	if !info.Mode().IsRegular() {
+		return &ValidationError{
+			Field:   "ssh_key_path",
+			Message: "SSH key path is not a regular file",
+		}
+	}
+
+	// Check permissions (should be 0600 or stricter on Unix systems)
+	// On Windows, permission checks are different, so we skip this
+	mode := info.Mode().Perm()
+	if mode&0077 != 0 {
+		return &ValidationError{
+			Field:   "ssh_key_path",
+			Message: fmt.Sprintf("SSH key has overly permissive permissions %#o (should be 0600)", mode),
+		}
+	}
+
+	// Try to parse key to ensure it's valid
+	keyData, err := os.ReadFile(keyPath)
+	if err != nil {
+		return &ValidationError{
+			Field:   "ssh_key_path",
+			Message: fmt.Sprintf("cannot read SSH key: %v", err),
+		}
+	}
+
+	// Attempt to parse the private key
+	_, err = ssh.ParsePrivateKey(keyData)
+	if err != nil {
+		// If it's encrypted, that's OK - we'll prompt for passphrase at connection time
+		if !strings.Contains(err.Error(), "encrypted") && !strings.Contains(err.Error(), "passphrase") {
+			return &ValidationError{
+				Field:   "ssh_key_path",
+				Message: fmt.Sprintf("invalid SSH key format: %v", err),
+			}
+		}
+		// Encrypted key is acceptable
+	}
+
+	return nil
+}
+
+// ValidateBandwidthLimit checks bandwidth limit is non-negative
+func ValidateBandwidthLimit(limit int) error {
+	if limit < 0 {
+		return &ValidationError{
+			Field:   "bandwidth_limit",
+			Message: "bandwidth limit cannot be negative",
+		}
+	}
+	return nil
+}
+
+// ValidateCompressionLevel checks compression level is in range 0-9
+func ValidateCompressionLevel(level int) error {
+	if level < 0 || level > 9 {
+		return &ValidationError{
+			Field:   "compression_level",
+			Message: fmt.Sprintf("compression level must be between 0 and 9, got %d", level),
+		}
+	}
+	return nil
 }

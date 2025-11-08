@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -112,7 +113,7 @@ func SaveKeyPair(privateKeyPath, publicKeyPath string, privateKey, publicKey []b
 	return nil
 }
 
-// DeployPublicKey deploys a public key to a remote host
+// DeployPublicKey deploys a public key to a remote host using SFTP for security
 func DeployPublicKey(ctx context.Context, cfg *Config, publicKey []byte) error {
 	client, err := NewClient(cfg)
 	if err != nil {
@@ -124,19 +125,50 @@ func DeployPublicKey(ctx context.Context, cfg *Config, publicKey []byte) error {
 	}
 	defer client.Close()
 
-	// Ensure .ssh directory exists
-	if _, err := client.RunCommand(ctx, "mkdir -p ~/.ssh && chmod 700 ~/.ssh"); err != nil {
-		return fmt.Errorf("failed to create .ssh directory: %w", err)
+	// Create SFTP client for secure file operations
+	sftpClient, err := sftp.NewClient(client.GetClient())
+	if err != nil {
+		return fmt.Errorf("failed to create SFTP client: %w", err)
+	}
+	defer sftpClient.Close()
+
+	// Ensure .ssh directory exists with correct permissions
+	sshDir := ".ssh"
+	if err := sftpClient.MkdirAll(sshDir); err != nil {
+		// Directory might already exist, try to continue
+		if !os.IsExist(err) {
+			return fmt.Errorf("failed to create .ssh directory: %w", err)
+		}
 	}
 
-	// Append public key to authorized_keys
-	command := fmt.Sprintf(
-		"echo '%s' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys",
-		string(publicKey),
-	)
+	// Set .ssh directory permissions (0700)
+	if err := sftpClient.Chmod(sshDir, 0700); err != nil {
+		return fmt.Errorf("failed to set .ssh directory permissions: %w", err)
+	}
 
-	if _, err := client.RunCommand(ctx, command); err != nil {
-		return fmt.Errorf("failed to add public key: %w", err)
+	// Open authorized_keys file for append
+	authKeysPath := filepath.Join(sshDir, "authorized_keys")
+	f, err := sftpClient.OpenFile(authKeysPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY)
+	if err != nil {
+		return fmt.Errorf("failed to open authorized_keys: %w", err)
+	}
+	defer f.Close()
+
+	// Write public key atomically
+	if _, err := f.Write(publicKey); err != nil {
+		return fmt.Errorf("failed to write public key: %w", err)
+	}
+
+	// Ensure newline at end if not present
+	if len(publicKey) > 0 && publicKey[len(publicKey)-1] != '\n' {
+		if _, err := f.Write([]byte("\n")); err != nil {
+			return fmt.Errorf("failed to write newline: %w", err)
+		}
+	}
+
+	// Set correct permissions on authorized_keys (0600)
+	if err := sftpClient.Chmod(authKeysPath, 0600); err != nil {
+		return fmt.Errorf("failed to set authorized_keys permissions: %w", err)
 	}
 
 	return nil
