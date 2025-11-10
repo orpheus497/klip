@@ -7,7 +7,7 @@ KLIPC_BIN := klipc
 KLIPR_BIN := klipr
 
 # Build information
-VERSION := 2.0.0
+VERSION := 2.2.0
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GO_VERSION := $(shell go version | awk '{print $$3}')
