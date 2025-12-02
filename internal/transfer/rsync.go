@@ -114,7 +114,12 @@ func (r *RsyncTransfer) buildRsyncArgs() []string {
 		args = append(args, "-e", fmt.Sprintf("ssh %s", strings.Join(sshArgs, " ")))
 	}
 
-	// Determine the host to use (resolved host takes precedence)
+	// Determine the host to use for the rsync connection.
+	// ResolvedHost is set by the ConnectionHelper after backend detection and
+	// contains the VPN-resolved IP address for VPN backends (tailscale, headscale, netbird).
+	// This ensures rsync connects through the correct network path.
+	// If ResolvedHost is empty (e.g., for LAN backend or if resolution was skipped),
+	// the original profile hostname is used and DNS resolution happens at connection time.
 	remoteHost := r.config.Profile.RemoteHost
 	if r.config.ResolvedHost != "" {
 		remoteHost = r.config.ResolvedHost

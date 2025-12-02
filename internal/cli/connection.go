@@ -128,6 +128,9 @@ func (h *ConnectionHelper) CreateSSHClient(ctx context.Context, timeout int) (*s
 }
 
 // resolveHostname resolves the hostname via the selected backend
+// For VPN backends (tailscale, headscale, netbird), this queries the VPN network
+// to resolve the hostname to an internal IP. For LAN backend, the hostname is
+// used directly and DNS resolution happens at connection time.
 func (h *ConnectionHelper) resolveHostname(ctx context.Context) (string, error) {
 	// Use the actual backend name (which may be auto-detected)
 	// not the profile setting (which could be "auto")
@@ -139,15 +142,12 @@ func (h *ConnectionHelper) resolveHostname(ctx context.Context) (string, error) 
 	}
 
 	// For VPN backends (tailscale, headscale, netbird), resolve hostname to IP via backend
+	// This ensures we connect through the VPN network rather than attempting direct DNS resolution
 	resolvedHost, err := h.Backend.GetPeerIP(ctx, h.Profile.RemoteHost)
 	if err != nil {
-		// If VPN resolution fails, fall back to the original hostname
-		// This allows DNS resolution to try at connection time
-		h.Log.Warn("VPN hostname resolution failed, using original hostname",
-			"backend", backendName,
-			"hostname", h.Profile.RemoteHost,
-			"error", err)
-		return h.Profile.RemoteHost, nil
+		// Return the error for VPN backends since hostname resolution is critical
+		// for proper routing through the VPN network
+		return "", fmt.Errorf("failed to resolve hostname via %s: %w (hint: ensure the host is reachable via %s)", backendName, err, backendName)
 	}
 
 	return resolvedHost, nil
