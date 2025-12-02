@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -92,7 +93,7 @@ func isAuthError(err error) bool {
 		return false
 	}
 
-	errStr := err.Error()
+	errStr := strings.ToLower(err.Error())
 	authErrors := []string{
 		"unable to authenticate",
 		"permission denied",
@@ -101,26 +102,10 @@ func isAuthError(err error) bool {
 	}
 
 	for _, authErr := range authErrors {
-		if contains(errStr, authErr) {
+		if strings.Contains(errStr, authErr) {
 			return true
 		}
 	}
 
 	return false
-}
-
-// contains checks if a string contains a substring (case-insensitive)
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && indexOf(s, substr) >= 0))
-}
-
-// indexOf returns the index of substr in s, or -1 if not found
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
 }

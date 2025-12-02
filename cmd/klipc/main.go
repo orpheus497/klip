@@ -148,6 +148,7 @@ func runCopy(cmd *cobra.Command, args []string) {
 	transferConfig := &transfer.TransferConfig{
 		SSHClient:           client,
 		Profile:             helper.Profile,
+		ResolvedHost:        helper.ResolvedHost,
 		SourcePath:          sourcePath,
 		DestPath:            destPath,
 		Direction:           transfer.DirectionPush,

@@ -39,6 +39,10 @@ type TransferConfig struct {
 	// Profile contains connection profile information
 	Profile *config.Profile
 
+	// ResolvedHost is the resolved hostname/IP to use for the connection
+	// This should be set by the connection helper after backend resolution
+	ResolvedHost string
+
 	// SourcePath is the source file or directory path
 	SourcePath string
 
