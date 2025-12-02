@@ -148,6 +148,7 @@ func runRetrieve(cmd *cobra.Command, args []string) {
 	transferConfig := &transfer.TransferConfig{
 		SSHClient:           client,
 		Profile:             helper.Profile,
+		ResolvedHost:        helper.ResolvedHost,
 		SourcePath:          remotePath,
 		DestPath:            destPath,
 		Direction:           transfer.DirectionPull,

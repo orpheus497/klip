@@ -25,10 +25,11 @@ type ConnectionConfig struct {
 // ConnectionHelper assists with connection setup and management
 // This eliminates code duplication across klip, klipc, and klipr commands
 type ConnectionHelper struct {
-	Config  *config.Config
-	Profile *config.Profile
-	Backend backend.Backend
-	Log     *logger.Logger
+	Config       *config.Config
+	Profile      *config.Profile
+	Backend      backend.Backend
+	Log          *logger.Logger
+	ResolvedHost string // The resolved hostname/IP after backend resolution
 }
 
 // NewConnectionHelper creates a connection helper with profile selection
@@ -89,6 +90,9 @@ func (h *ConnectionHelper) CreateSSHClient(ctx context.Context, timeout int) (*s
 		return nil, err
 	}
 
+	// Store the resolved hostname for later use (e.g., rsync transfers)
+	h.ResolvedHost = hostname
+
 	h.Log.Debug("Resolved hostname", "backend", h.Backend.Name(), "hostname", hostname)
 
 	// Create SSH configuration
@@ -125,15 +129,25 @@ func (h *ConnectionHelper) CreateSSHClient(ctx context.Context, timeout int) (*s
 
 // resolveHostname resolves the hostname via the selected backend
 func (h *ConnectionHelper) resolveHostname(ctx context.Context) (string, error) {
-	// For LAN backend or auto mode, use hostname directly
-	if h.Profile.Backend == config.BackendLAN || h.Profile.Backend == "" {
+	// Use the actual backend name (which may be auto-detected)
+	// not the profile setting (which could be "auto")
+	backendName := h.Backend.Name()
+
+	// For LAN backend, use hostname directly (DNS resolution will happen at connection time)
+	if backendName == "lan" {
 		return h.Profile.RemoteHost, nil
 	}
 
-	// For VPN backends, resolve hostname to IP via backend
+	// For VPN backends (tailscale, headscale, netbird), resolve hostname to IP via backend
 	resolvedHost, err := h.Backend.GetPeerIP(ctx, h.Profile.RemoteHost)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve hostname via %s: %w", h.Backend.Name(), err)
+		// If VPN resolution fails, fall back to the original hostname
+		// This allows DNS resolution to try at connection time
+		h.Log.Warn("VPN hostname resolution failed, using original hostname",
+			"backend", backendName,
+			"hostname", h.Profile.RemoteHost,
+			"error", err)
+		return h.Profile.RemoteHost, nil
 	}
 
 	return resolvedHost, nil

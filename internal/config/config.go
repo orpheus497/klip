@@ -165,6 +165,10 @@ func (c *Config) GetProfile(name string) (*Profile, error) {
 	if !exists {
 		return nil, fmt.Errorf("profile '%s' not found", name)
 	}
+	// Ensure the profile name is set (it may not be stored in the YAML)
+	if profile.Name == "" {
+		profile.Name = name
+	}
 	return profile, nil
 }
 

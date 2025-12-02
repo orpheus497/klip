@@ -114,19 +114,25 @@ func (r *RsyncTransfer) buildRsyncArgs() []string {
 		args = append(args, "-e", fmt.Sprintf("ssh %s", strings.Join(sshArgs, " ")))
 	}
 
+	// Determine the host to use (resolved host takes precedence)
+	remoteHost := r.config.Profile.RemoteHost
+	if r.config.ResolvedHost != "" {
+		remoteHost = r.config.ResolvedHost
+	}
+
 	// Source and destination
 	if r.config.Direction == DirectionPush {
 		// Local to remote
 		args = append(args, r.config.SourcePath)
 		args = append(args, fmt.Sprintf("%s@%s:%s",
 			r.config.Profile.RemoteUser,
-			r.config.Profile.RemoteHost,
+			remoteHost,
 			r.config.DestPath))
 	} else {
 		// Remote to local
 		args = append(args, fmt.Sprintf("%s@%s:%s",
 			r.config.Profile.RemoteUser,
-			r.config.Profile.RemoteHost,
+			remoteHost,
 			r.config.SourcePath))
 		args = append(args, r.config.DestPath)
 	}

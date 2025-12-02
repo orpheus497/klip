@@ -558,7 +558,8 @@ func runProfileValidate(cmd *cobra.Command, args []string) {
 	// Check backend availability
 	ui.PrintInfo("Checking backend availability...")
 	ctx := context.Background()
-	detector := backend.NewDetector(nil)
+	registry := backend.NewRegistry()
+	detector := backend.NewDetector(registry)
 	selectedBackend, err := detector.SelectBackend(ctx, string(profile.Backend))
 	if err != nil {
 		ui.PrintError("Backend detection failed: %v", err)
